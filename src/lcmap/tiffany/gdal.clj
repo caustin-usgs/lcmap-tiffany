@@ -48,17 +48,46 @@
 (mount/defstate gdal-init
   :start (init))
 
+(defn dataset_and_band
+  [output_name x_dim y_dim]
+  (let [tiff_driver  (gdal/GetDriverByName "GTiff")
+        tiff_dataset (.Create tiff_driver output_name x_dim y_dim)
+        tiff_band    (.GetRasterBand tiff_dataset 1)]
+    [tiff_dataset tiff_band]))
+
+(defn write_data
+  [tiff_dataset tiff_band x_offset y_offset x_dim y_dim values]
+  (.WriteRaster tiff_band x_offset y_offset x_dim y_dim (float-array values))
+  (.delete tiff_band)
+  (.delete tiff_dataset))
+
+(defn set_transform_and_proj
+  [ulx uly tiff_dataset proj_wkt]
+  (let [transform (double-array [ulx 30 0 uly 0 -30])] ;(XULCorner,Cellsize,0,YULCorner,0,-Cellsize)
+    (.SetGeoTransform tiff_dataset transform)
+    (.SetProjection tiff_dataset proj_wkt)))
+
 (defn geotiff_from_pixel_array
   [pixel_array output_name ulx uly proj_wkt]
-  (let [tif_driver  (gdal/GetDriverByName "GTiff")
-        tif_dataset (.Create tif_driver output_name 100 100)
-        tif_band    (.GetRasterBand tif_dataset 1)
-        transform_array (double-array [ulx 30 0 uly 0 30])] ;(XULCorner,Cellsize,0,YULCorner,0,-Cellsize)
-    (.SetGeoTransform tif_dataset transform_array) 
-    (.SetProjection tif_dataset proj_wkt)
-    (.WriteRaster tif_band 0 0 100 100 (float-array pixel_array)) 
-    ; write to disk
-    (.delete tif_band)
-    (.delete tif_dataset))
+  (let [[tiff_dataset tiff_band] (dataset_and_band output_name 100 100)]
+    (set_transform_and_proj ulx uly tiff_dataset proj_wkt)
+    (write_data tiff_dataset tiff_band 0 0 100 100 pixel_array))
   output_name)
+
+(defn create_tile_tiff
+  [tile_name ulx uly proj_wkt]
+  (let [[tiff_dataset tiff_band] (dataset_and_band tile_name 5000 5000)]
+    (set_transform_and_proj ulx uly tiff_dataset proj_wkt)
+    (write_data tiff_dataset tiff_band 0 0 5000 5000 (repeat (* 5000 5000) 0))))
+
+(defn add_chip_to_tile
+  ([tile_tiff_path chip_values x_offset y_offset x_size y_size]
+   (let [tile_dataset (gdal/Open tile_tiff_path 1)
+         tile_band (.GetRasterBand tile_dataset 1)]
+     (.WriteRaster tile_band x_offset y_offset x_size y_size (float-array chip_values))
+     (.delete tile_band)
+     (.delete tile_dataset)))
+  ([tile_tiff_path chip_values x_offset y_offset]
+   (add_chip_to_tile tile_tiff_path chip_values x_offset y_offset 100 100)))
+
 

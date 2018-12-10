@@ -1,8 +1,10 @@
 (ns lcmap.tiffany.util
   (:require [environ.core :as environ]
+            [clojure.spec.alpha :as spec]
             [cheshire.core :as json]
             [org.httpkit.client :as http]
             [lcmap.tiffany.file :as file]))
+
 
 (defn flatten-vals
   "Flatten the values for a collection of hash-maps"
