@@ -48,46 +48,35 @@
 (mount/defstate gdal-init
   :start (init))
 
-(defn dataset_and_band
-  [output_name x_dim y_dim]
-  (let [tiff_driver  (gdal/GetDriverByName "GTiff")
-        tiff_dataset (.Create tiff_driver output_name x_dim y_dim)
-        tiff_band    (.GetRasterBand tiff_dataset 1)]
-    [tiff_dataset tiff_band]))
+(defn create_geotiff
+  [name values ulx uly projection x_size y_size x_offset y_offset]
+  (let [driver  (gdal/GetDriverByName "GTiff")
+        dataset (.Create driver name x_size y_size)
+        band    (.GetRasterBand dataset 1)
+        transform (double-array [ulx 30 0 uly 0 -30])]
+    (.SetGeoTransform dataset transform)
+    (.SetProjection dataset projection)
+    (.WriteRaster band x_offset y_offset x_size y_size (float-array values))
+    (.delete band)
+    (.delete dataset))
+  name)
 
-(defn write_data
-  [tiff_dataset tiff_band x_offset y_offset x_dim y_dim values]
-  (.WriteRaster tiff_band x_offset y_offset x_dim y_dim (float-array values))
-  (.delete tiff_band)
-  (.delete tiff_dataset))
+(defn create_blank_tile_tiff
+  [name ulx uly projection]
+  (let [values (repeat (* 5000 5000) 0)]
+    (create_geotiff name values ulx uly projection 5000 5000 0 0)))
 
-(defn set_transform_and_proj
-  [ulx uly tiff_dataset proj_wkt]
-  (let [transform (double-array [ulx 30 0 uly 0 -30])] ;(XULCorner,Cellsize,0,YULCorner,0,-Cellsize)
-    (.SetGeoTransform tiff_dataset transform)
-    (.SetProjection tiff_dataset proj_wkt)))
-
-(defn geotiff_from_pixel_array
-  [pixel_array output_name ulx uly proj_wkt]
-  (let [[tiff_dataset tiff_band] (dataset_and_band output_name 100 100)]
-    (set_transform_and_proj ulx uly tiff_dataset proj_wkt)
-    (write_data tiff_dataset tiff_band 0 0 100 100 pixel_array))
-  output_name)
-
-(defn create_tile_tiff
-  [tile_name ulx uly proj_wkt]
-  (let [[tiff_dataset tiff_band] (dataset_and_band tile_name 5000 5000)]
-    (set_transform_and_proj ulx uly tiff_dataset proj_wkt)
-    (write_data tiff_dataset tiff_band 0 0 5000 5000 (repeat (* 5000 5000) 0))))
+(defn create_chip_tiff
+  [name values ulx uly projection]
+  (create_geotiff name values ulx uly projection 100 100 0 0))
 
 (defn add_chip_to_tile
-  ([tile_tiff_path chip_values x_offset y_offset x_size y_size]
-   (let [tile_dataset (gdal/Open tile_tiff_path 1)
-         tile_band (.GetRasterBand tile_dataset 1)]
-     (.WriteRaster tile_band x_offset y_offset x_size y_size (float-array chip_values))
-     (.delete tile_band)
-     (.delete tile_dataset)))
-  ([tile_tiff_path chip_values x_offset y_offset]
-   (add_chip_to_tile tile_tiff_path chip_values x_offset y_offset 100 100)))
-
+  ([tiff_name values x_offset y_offset x_size y_size]
+   (let [dataset (gdal/Open tiff_name 1)
+         band (.GetRasterBand dataset 1)]
+     (.WriteRaster band x_offset y_offset x_size y_size (float-array values))
+     (.delete band)
+     (.delete dataset)))
+  ([tiff_name values x_offset y_offset]
+   (add_chip_to_tile tiff_name values x_offset y_offset 100 100)))
 

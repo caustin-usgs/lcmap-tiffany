@@ -12,13 +12,13 @@
 (def chips_per_tile_side  50)
 
 (defn generate-product
-  [input_file output_name]
-  (let [input (file/read-json input_file)
-        product_values (get input "values")
+  [infile name]
+  (let [input (file/read-json infile)
+        values (get input "values")
         chipx (get input "x")
         chipy (get input "y")
-        proj_wkt (util/get-projection "local")]
-    (gdal/geotiff_from_pixel_array product_values output_name chipx chipy proj_wkt)))
+        projection (util/get-projection "local")]
+    (gdal/create_chip_tiff name values chipx chipy projection)))
 
 (defn calc_offset
   "Returns pixel offset for UL coordinates of chips"
