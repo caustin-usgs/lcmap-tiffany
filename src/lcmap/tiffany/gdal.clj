@@ -61,16 +61,7 @@
     (.delete dataset))
   name)
 
-(defn create_blank_tile_tiff
-  [name ulx uly projection]
-  (let [values (repeat (* 5000 5000) 0)]
-    (create_geotiff name values ulx uly projection 5000 5000 0 0)))
-
-(defn create_chip_tiff
-  [name values ulx uly projection]
-  (create_geotiff name values ulx uly projection 100 100 0 0))
-
-(defn add_chip_to_tile
+(defn update_geotiff
   ([tiff_name values x_offset y_offset x_size y_size]
    (let [dataset (gdal/Open tiff_name 1)
          band (.GetRasterBand dataset 1)]
@@ -78,5 +69,5 @@
      (.delete band)
      (.delete dataset)))
   ([tiff_name values x_offset y_offset]
-   (add_chip_to_tile tiff_name values x_offset y_offset 100 100)))
+   (update_geotiff tiff_name values x_offset y_offset 100 100)))
 
